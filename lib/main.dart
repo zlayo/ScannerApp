@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io' as io;
+import 'package:path/path.dart';
 
 String barcodeResult = '';
 
@@ -63,8 +67,38 @@ Future<String> scanBarcode() async {
     barcodeScanRes = await FlutterBarcodeScanner.scanBarcode(
         "#ff6666", 'Scan another', true, ScanMode.BARCODE);
     print(barcodeScanRes);
+    insertData({'ticketno': barcodeScanRes, 'scanned': true});
   } catch (e) {
     print('Unknown error: $e');
   }
   return barcodeScanRes;
+}
+
+class DBHelper {
+  static Database? _db = null;
+
+  Future<Database?> get db async {
+    if (_db != null) {
+      return _db;
+    }
+    _db = await initDatabase();
+    return _db;
+  }
+
+  initDatabase() async {
+    io.Directory documentsDirectory = await getApplicationDocumentsDirectory();
+    String path = join(documentsDirectory.path, 'tickets.db');
+    var db = await openDatabase(path, version: 1, onCreate: _onCreate);
+    return db;
+  }
+
+  _onCreate(Database db, int version) async {
+    await db.execute(
+        'CREATE TABLE tickets (id INTEGER PRIMARY KEY, ticketno TEXT, scanned boolean DEFAULT false, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)');
+  }
+}
+
+Future<void> insertData(Map<String, dynamic> data) async {
+  var dbClient = await DBHelper().db;
+  await dbClient!.insert('tickets', data);
 }
